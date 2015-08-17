@@ -1,0 +1,12 @@
+8/11/15 V1.2.0
+    '~' Prints the tape up to the position of the current pointer if the -d option is enabled
+    No longer freaks out about mismatched brackets in some circumstances.
+    Usage: bf file [-d]
+
+11/20/14 V1.1.0
+    Command line arguments accepted
+
+11/17/14 V1.0.0
+    Full interpreter
+    Minor optimizations
+    Flag -d for diagnostics
