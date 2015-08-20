@@ -5,7 +5,17 @@
  
  Usage:
  
- bf file.bf [-d]
+ bf [-d] [-h] [-L <language>] [-P <print mode>] <file>
+ 
+ 8/20/15 1.3.1
+ Added ??? to the language list
+ Added -P flag and print modes : char, num, hex, smart
+ 
+ 8/20/15 1.3.0
+ General Parser implementation
+ Code restructure
+ Usage improved
+ Various minor fixes and changes
  
  8/11/15 V1.2.0
  '~' Prints the tape up to the position of the current pointer if the -d option is enabled
@@ -21,434 +31,154 @@
  
  */
 
-
-
 #include "stdio.h"
 #include "stdlib.h"
+#include "string.h"
 
-#define VERSION_MAJOR 1
-#define VERSION_PATCH 2
-#define VERSION_TEST 0
+#include "common.h"
+#include "parse.h"
 
-typedef enum {
-    bf_end,
-    bf_add,
-    bf_subtract,
-    bf_right,
-    bf_left,
-    bf_output,
-    bf_input,
-    bf_open,
-    bf_close,
-    bf_print
-} bf_type;
+int run(bf_command* prgm, int debug, void (*printchar)(char byte));
 
-typedef struct {
-    bf_type type;
-    int val; /* Will represent the magnitude of increments, or the pointer to jump to... */
-} bf_command;
-
-bf_command* load(FILE* file);
-void run(bf_command* prgm);
-void printprogram(bf_command* prgm);
-
-unsigned char RAM[30000];
-int halt = 0;
-int print_diagnostics = 0;
-int bf_run = 0;
-int cmd_run = 0;
+void printchar(char byte);
+void printnum(char byte);
+void printhex(char byte);
+void printsmart(char byte);
 
 int main(int argc, const char * argv[]) {
-    if (argc < 2)
+    /* Default settings */
+    char* cfile = NULL;
+    ParseFunction prse = ParseBF;
+    PrintFunction prnt = PrintBF;
+    void (*printmode)(char) = NULL;
+    int print_diagnostics = 0;
+    
+    /* We no longer support an on-the-fly interpreter (interactive mode may be in the works) */
+    if (argc < 2) {
         printf("Brainf>>k Interpreter V%d.%d.%d\n", VERSION_MAJOR, VERSION_PATCH, VERSION_TEST);
-    char cfile[500];
-    
-ask_for_file:
-    bf_run = 0;
-    cmd_run = 0;
-    print_diagnostics = 0;
-    
-    if (argc >= 2) {
-        int iii;
-        for (iii = 0; argv[1][iii] != '\0'; iii++) {
-            cfile[iii] = argv[1][iii];
-        }
-        cfile[iii] = '\0';
-        
-        if (argc >= 3) {
-            if (argv[2][0] == '-' && argv[2][1] == 'd') {
-                print_diagnostics = 1;
-            }
-        }
-    }
-    else {
-        printf("Enter a file [-d] to execute, or Q to quit\n");
-        scanf(" %[^\n]", cfile);
-        while (getchar() != '\n') ;
-    }
-    
-    if (cfile[0] == 'Q' && cfile[1] == '\0') {
+        printf("Usage: bf [-dh] [-L <language>] [-P <print mode>] <file>\n");
         return 0;
     }
-    
-    int ccount;
-    for (ccount = 0; 1; ccount++) {
-        if (cfile[ccount] == '.' && ccount != 0) {
-            break;
-        }
-        if (cfile[ccount] == '\0') {
-            halt = 1;
-            break;
-        }
-    }
-    if (halt) {
-        printf("Invalid file extension.\n");
-        if (argc < 2) {
-            goto ask_for_file;
-        }
-        else {
-            return 0;
-        }
-    }
-    
-    if (cfile[ccount + 1] != 'b' || cfile[ccount + 2] != 'f') {
-        printf("Invalid file extension.\n");
-        if (argc < 2) {
-            goto ask_for_file;
-        }
-        else {
-            return 0;
-        }
-    }
-    ccount += 3;
-    int flgcount;
-    for (flgcount = ccount; cfile[flgcount] != '\0'; flgcount++) {
-        if (cfile[flgcount] == '-' && cfile[flgcount + 1] == 'd') {
-            print_diagnostics = 1;
-            cfile[ccount] = '\0';
-            break;
-        }
-    }
-    
-    FILE* file = fopen(cfile, "r");
-    if (!file) {
-        printf("File failed loading.\n");
-        if (argc < 2) {
-            goto ask_for_file;
-        }
-        else {
-            return 0;
-        }
-    }
-    
-    if (print_diagnostics) printf("Parsing...\n");
-    bf_command* prgm = load(file);
-    fclose(file);
-    if (!prgm) {
-        printf("File failed loading.\n");
-        if (argc < 2) {
-            goto ask_for_file;
-        }
-        else {
-            return 0;
-        }
-    }
-    while (halt) {
-        printf("There was an error parsing the program. Continue anyway? (Y/N)");
-        scanf(" %c ", cfile);
-        if (cfile[0] != 'N' && cfile[0] != 'Y'){
-            continue;
-        }
-        if (cfile[0] == 'N') {
-            return 1;
-        }
-        else halt = 0;
-    }
-    
-    int i = 0, j = 0;
-    int count = 0;
-    int commands_read = 0;
-    while (prgm[i].type != bf_end) {
-        if (prgm[i].type == bf_open) {
-            j = i + 1;
-            while (prgm[j].type != bf_end) {
-                if (prgm[j].type == bf_open) {
-                    count++;
+    else {
+        /* Parse the options */
+        int arg;
+        for (arg = 1; arg < argc; arg++) {
+            /* Options should start with '-' otherwise, there is no order in the world... */
+            if (argv[arg][0] == '-') {
+                switch (argv[arg][1]) {
+                    case 'd' :
+                        print_diagnostics = 1;
+                        break;
+                    
+                    case 'h' :
+                        printf("Brainf>>k Interpreter V%d.%d.%d\n", VERSION_MAJOR, VERSION_PATCH, VERSION_TEST);
+                        printf("Usage: bf [-dh] [-L <language>] [-P <print mode>] <file>\n");
+                        printf("Options:\n");
+                        printf("\t-d : Enable debugging symbols and print diagnostics\n");
+                        printf("\t-h : Print help\n");
+                        printf("\t-L <language> : Sets the language to interpret (BF is default)\n\t\tValid languages:"
+#define X(id, name) " " name
+                               X_LANGUAGES
+#undef X
+                               "\n");
+                        printf("\t-P <print mode> : Sets the print mode for output (char is default)\n");
+                        printf("\t\tchar : Print bytes as characters\n");
+                        printf("\t\tnum : Print bytes as space-separated numerical values\n");
+                        printf("\t\thex : Print bytes as space-separated hexadecimal values\n");
+                        printf("\t\tsmart : Print bytes as characters if printable, as hex otherwise\n");
+                        return 0;
+                        break;
+                     
+                    case 'L' :
+                        if (arg >= argc - 2) {
+                            printf("Error: No language specified.\n");
+                            return 0;
+                        }
+                        else {
+                            arg++;
+                            /* This is a bit hacky, but we need a leading "if" for "else if" */
+                            if (argv[arg] == NULL) {return PARSE_MEMORY;}
+#define X(id, name) else if(strcmp(argv[arg], name) == 0) prse = Parse##id, prnt = Print##id;
+                            X_LANGUAGES
+#undef X                    
+                            else {
+                                printf("Error: Unidentified language.\n");
+                                return 0;
+                            }
+                        }
+                        break;
+                        
+                    case 'P' :
+                        if (arg >= argc - 2) {
+                            printf("Error: No print mode specified.\n");
+                            return 0;
+                        }
+                        else {
+                            arg++;
+                            if (strcmp(argv[arg], "char") == 0) {
+                                printmode = printchar;
+                            }
+                            else if (strcmp(argv[arg], "num") == 0) {
+                                printmode = printnum;
+                            }
+                            else if (strcmp(argv[arg], "hex") == 0) {
+                                printmode = printhex;
+                            }
+                            else if (strcmp(argv[arg], "smart") == 0) {
+                                printmode = printsmart;
+                            }
+                            else {
+                                
+                            }
+                        }
+                        break;
+
+                    default:
+                        printf("Error: Unidentified argument. Use -h for usage details.\n");
+                        return 0;
                 }
-                else if (prgm[j].type == bf_close) {
-                    count--;
-                }
-                if (count == -1) {
-                    prgm[i].val = j;
-                    prgm[j].val = i;
-                    count = 0;
-                    break;
-                }
-                j++;
-            }
-            
-            if (prgm[j].type == bf_end) {
-                printf("Error: Mismatched brackets.\n");
-                printf("This information was parsed:\n");
-                printprogram(prgm);
-                printf("\n");
-                free(prgm);
-                if (argc < 2) {
-                    goto ask_for_file;
-                }
-                else {
-                    return 0;
-                }
-            }
-        }
-        if (prgm[i].type == bf_close && prgm[i].val == -1) {
-            printf("Error: Mismatched brackets.\n");
-            printf("This information was parsed:\n");
-            printprogram(prgm);
-            printf("\n");
-            free(prgm);
-            if (argc < 2) {
-                goto ask_for_file;
             }
             else {
-                return 0;
+                /* This *should* be the last argument */
+                cfile = (char*)argv[arg];
             }
         }
-        if (prgm[i].type == bf_add || prgm[i].type == bf_subtract ||
-            prgm[i].type == bf_right || prgm[i].type == bf_left) {
-            commands_read += prgm[i].val;
+    }
+    int err, num, read;
+    
+    if (print_diagnostics) {
+        printf("Parsing...\n");
+    }
+    
+    bf_command* prgm = (*prse)(cfile, &num, &read, &err);
+    if (err) {
+        if (prgm) {
+            printf("Information parsed:\n");
+            (*prnt)(NULL, prgm);
+            free(prgm);
         }
-        else if(prgm[i].type != bf_print) commands_read++;
-        i++;
+        printf("PARSING ENDED WITH ERROR CODE %d\n", err);
+        return err;
     }
     
     if (print_diagnostics){
-        printf("Success! %d BF characters read, condensed into %d commands.\n", commands_read, i);
-        printprogram(prgm);
+        printf("Success! %d BF characters read, condensed into %d VM commands.\n", read, num);
+        (*prnt)(NULL, prgm);
         printf("\n");
         printf("Running...\n");
     }
     if (argc == 1) printf("\n");
-    run(prgm);
-    if (argc == 1) {
-        printf("\n");
-        printf("Program has terminated successfully! Press enter to continue... \n");
-        scanf("%*[^\n]%*c");
-    }
+    int vm_run = run(prgm, print_diagnostics, printmode);
     if (print_diagnostics) {
-        printf("%d total BF commands run, or %d converted commands.\n", bf_run, cmd_run);
-    }
-    if (argc == 1) {
-        goto ask_for_file;
+        printf("%d total VM commands run.\n", vm_run);
     }
     return 0;
 }
 
-bf_command* load(FILE* file){
-    bf_command* prgm = NULL;
-    bf_command* tmp;
-    int end = 0;
-    int num = 0;
-    int current = -1;
-    char c = getc(file);
-    char last = 'A';
-    while (!end && !halt) {
-        switch (c) {
-            case EOF:
-                end = 1;
-                break;
-            
-            case '+':
-                if (last == c) {
-                    prgm[current].val++;
-                }
-                else {
-                    tmp = realloc(prgm, (num + 1) * sizeof(bf_command));
-                    if (!tmp) {
-                        printf("Parser error! Ran out of memory at command %d.\n", num);
-                        prgm[current].type = bf_end;
-                        halt = 1;
-                    }
-                    else {
-                        prgm = tmp;
-                        num++;
-                        current = num - 1;
-                        prgm[current].type = bf_add;
-                        prgm[current].val = 1;
-                    }
-                }
-                break;
-                
-            case '-':
-                if (last == c) {
-                    prgm[current].val++;
-                }
-                else {
-                    tmp = realloc(prgm, (num + 1) * sizeof(bf_command));
-                    if (!tmp) {
-                        printf("Parser error! Ran out of memory at command %d.\n", num);
-                        prgm[current].type = bf_end;
-                        halt = 1;
-                    }
-                    else {
-                        prgm = tmp;
-                        num++;
-                        current = num - 1;
-                        prgm[current].type = bf_subtract;
-                        prgm[current].val = 1;
-                    }
-                }
-                break;
-                
-            case '>':
-                if (last == c) {
-                    prgm[current].val++;
-                }
-                else {
-                    tmp = realloc(prgm, (num + 1) * sizeof(bf_command));
-                    if (!tmp) {
-                        printf("Parser error! Ran out of memory at command %d.\n", num);
-                        prgm[current].type = bf_end;
-                        halt = 1;
-                    }
-                    else {
-                        prgm = tmp;
-                        num++;
-                        current = num - 1;
-                        prgm[current].type = bf_right;
-                        prgm[current].val = 1;
-                    }
-                }
-                break;
-                
-            case '<':
-                if (last == c) {
-                    prgm[current].val++;
-                }
-                else {
-                    tmp = realloc(prgm, (num + 1) * sizeof(bf_command));
-                    if (!tmp) {
-                        printf("Parser error! Ran out of memory at command %d.\n", num);
-                        prgm[current].type = bf_end;
-                        halt = 1;
-                    }
-                    else {
-                        prgm = tmp;
-                        num++;
-                        current = num - 1;
-                        prgm[current].type = bf_left;
-                        prgm[current].val = 1;
-                    }
-                }
-                break;
-                
-            case ',':
-                tmp = realloc(prgm, (num + 1) * sizeof(bf_command));
-                if (!tmp) {
-                    printf("Parser error! Ran out of memory at command %d.\n", num);
-                    prgm[current].type = bf_end;
-                    halt = 1;
-                }
-                else {
-                    prgm = tmp;
-                    num++;
-                    current = num - 1;
-                    prgm[current].type = bf_input;
-                    prgm[current].val = -1;
-                }
-                break;
-                
-            case '.':
-                tmp = realloc(prgm, (num + 1) * sizeof(bf_command));
-                if (!tmp) {
-                    printf("Parser error! Ran out of memory at command %d.\n", num);
-                    prgm[current].type = bf_end;
-                    halt = 1;
-                }
-                else {
-                    prgm = tmp;
-                    num++;
-                    current = num - 1;
-                    prgm[current].type = bf_output;
-                    prgm[current].val = -1;
-                }
-                break;
-
-            case '[':
-                tmp = realloc(prgm, (num + 1) * sizeof(bf_command));
-                if (!tmp) {
-                    printf("Parser error! Ran out of memory at command %d.\n", num);
-                    prgm[current].type = bf_end;
-                    halt = 1;
-                }
-                else {
-                    prgm = tmp;
-                    num++;
-                    current = num - 1;
-                    prgm[current].type = bf_open;
-                    prgm[current].val = -1;
-                }
-                break;
-                
-            case ']':
-                tmp = realloc(prgm, (num + 1) * sizeof(bf_command));
-                if (!tmp) {
-                    printf("Parser error! Ran out of memory at command %d.\n", num);
-                    prgm[current].type = bf_end;
-                    halt = 1;
-                }
-                else {
-                    prgm = tmp;
-                    num++;
-                    current = num - 1;
-                    prgm[current].type = bf_close;
-                    prgm[current].val = -1;
-                }
-                break;
-            case '~':
-                tmp = realloc(prgm, (num + 1) * sizeof(bf_command));
-                if (!tmp) {
-                    printf("Parser error! Ran out of memory at command %d.\n", num);
-                    prgm[current].type = bf_end;
-                    halt = 1;
-                }
-                else {
-                    prgm = tmp;
-                    num++;
-                    current = num - 1;
-                    prgm[current].type = bf_print;
-                    prgm[current].val = -1;
-                }
-                break;
-            default:
-                break;
-        }
-        
-        last = c;
-        c = getc(file);
-    }
-    
-    if (!halt) {
-        tmp = realloc(prgm, (num + 1) * sizeof(bf_command));
-        if (!tmp) {
-            printf("Parser error! Ran out of memory at command %d.\n", num);
-            prgm[current].type = bf_end;
-            halt = 1;
-        }
-        else {
-            prgm = tmp;
-            num++;
-            current = num - 1;
-            prgm[current].type = bf_end;
-            prgm[current].val = 1;
-        }
-    }
-    
-    return prgm;
-}
-
-void run(bf_command* prgm){
+int run(bf_command* prgm, int debug, void (*printchar)(char byte)){
     int ptr;
+    int cmd_run;
+    char RAM[30000];
     for (ptr = 0; ptr < 30000; ptr++) {
         RAM[ptr] = 0;
     }
@@ -458,17 +188,17 @@ void run(bf_command* prgm){
         switch (prgm[current].type) {
             case bf_add:
                 RAM[ptr] += prgm[current].val;
-                if (print_diagnostics) {bf_run += prgm[current].val; cmd_run++;}
+                cmd_run++;
                 break;
                 
             case bf_subtract:
                 RAM[ptr] -= prgm[current].val;
-                if (print_diagnostics) {bf_run += prgm[current].val; cmd_run++;}
+                cmd_run++;
                 break;
                 
             case bf_right:
                 ptr += prgm[current].val;
-                if (print_diagnostics) {bf_run += prgm[current].val; cmd_run++;}
+                cmd_run++;
                 if (ptr > 29999) {
                     ptr = 29999;
                 }
@@ -476,38 +206,40 @@ void run(bf_command* prgm){
                 
             case bf_left:
                 ptr -= prgm[current].val;
-                if (print_diagnostics) {bf_run += prgm[current].val; cmd_run++;}
+                cmd_run++;
                 if (ptr < 0) {
                     ptr = 0;
                 }
                 break;
                 
             case bf_output:
-                putchar(RAM[ptr]);
-                if (print_diagnostics) {bf_run++; cmd_run++;}
+                if (printchar)
+                    (*printchar)(RAM[ptr]);
+                else putchar(RAM[ptr]);
+                cmd_run++;
                 break;
                 
             case bf_input:
                 RAM[ptr] = getchar();
-                if (print_diagnostics) {bf_run++; cmd_run++;}
+                cmd_run++;
                 break;
                 
             case bf_open:
                 if (!RAM[ptr]) {
                     current = prgm[current].val;
                 }
-                if (print_diagnostics) {bf_run++; cmd_run++;}
+                cmd_run++;
                 break;
                 
             case bf_close:
                 if (RAM[ptr]) {
                     current = prgm[current].val;
                 }
-                if (print_diagnostics) {bf_run++; cmd_run++;}
+                cmd_run++;
                 break;
                 
-            case bf_print:
-                if (print_diagnostics) {
+            case bf_debug:
+                if (debug) {
                     int i;
                     printf("\n(DEBUG INFO) Tape: [");
                     for (i = 0; i <= ptr; i++) {
@@ -521,49 +253,28 @@ void run(bf_command* prgm){
         }
         current++;
     }
+    return cmd_run;
 }
 
-void printprogram(bf_command* prgm){
-    int i = 0, count;
-    while (prgm[i].type != bf_end) {
-        switch (prgm[i].type) {
-            case bf_add:
-                for (count = 0; count < prgm[i].val; count++) {
-                    printf("+");
-                }
-                break;
-            case bf_subtract:
-                for (count = 0; count < prgm[i].val; count++) {
-                    printf("-");
-                }
-                break;
-            case bf_right:
-                for (count = 0; count < prgm[i].val; count++) {
-                    printf(">");
-                }
-                break;
-            case bf_left:
-                for (count = 0; count < prgm[i].val; count++) {
-                    printf("<");
-                }
-                break;
-            case bf_input:
-                printf(",");
-                break;
-            case bf_output:
-                printf(".");
-                break;
-            case bf_open:
-                printf("[");
-                break;
-                
-            case bf_close:
-                printf("]");
-                break;
-                
-            default:
-                break;
-        }
-        i++;
+void printchar(char byte) {
+    printf("%c", byte);
+}
+
+void printnum(char byte) {
+    printf("%d ", byte);
+}
+
+void printhex(char byte) {
+    printf("%x ", byte);
+}
+
+void printsmart(char byte) {
+    if (byte >= 32 && byte < 127) {
+        printf("%c", byte);
+    }
+    else {
+        printf("%x", byte);
     }
 }
+
+
