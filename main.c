@@ -5,7 +5,10 @@
  
  Usage:
  
- bf [-d] [-h] [-L <language>] [-P <print mode>] <file>
+ bf [-d] [-h] [-L <language>] [-P <print mode>] [-T <lang1> <lang2>] <file>
+ 
+ 8/20/15 1.3.2
+ Added -T flag for translation
  
  8/20/15 1.3.1
  Added ??? to the language list
@@ -52,11 +55,13 @@ int main(int argc, const char * argv[]) {
     PrintFunction prnt = PrintBF;
     void (*printmode)(char) = NULL;
     int print_diagnostics = 0;
+    int translate = 0;
     
     /* We no longer support an on-the-fly interpreter (interactive mode may be in the works) */
     if (argc < 2) {
         printf("Brainf>>k Interpreter V%d.%d.%d\n", VERSION_MAJOR, VERSION_PATCH, VERSION_TEST);
-        printf("Usage: bf [-dh] [-L <language>] [-P <print mode>] <file>\n");
+        printf("Usage: bf [-h] [-d] [-L <language>] [-P <print mode>] "
+               "[-T <lang1> <lang2>] <file>\n");
         return 0;
     }
     else {
@@ -72,7 +77,8 @@ int main(int argc, const char * argv[]) {
                     
                     case 'h' :
                         printf("Brainf>>k Interpreter V%d.%d.%d\n", VERSION_MAJOR, VERSION_PATCH, VERSION_TEST);
-                        printf("Usage: bf [-dh] [-L <language>] [-P <print mode>] <file>\n");
+                        printf("Usage: bf [-d] [-h] [-L <language>] [-P <print mode>] "
+                               "[-T <lang1> <lang2>] <file>\n");
                         printf("Options:\n");
                         printf("\t-d : Enable debugging symbols and print diagnostics\n");
                         printf("\t-h : Print help\n");
@@ -81,6 +87,7 @@ int main(int argc, const char * argv[]) {
                                X_LANGUAGES
 #undef X
                                "\n");
+                        printf("\t-T <lang1> <lang2> : Translate the file from <lang1> to <lang2>\n");
                         printf("\t-P <print mode> : Sets the print mode for output (char is default)\n");
                         printf("\t\tchar : Print bytes as characters\n");
                         printf("\t\tnum : Print bytes as space-separated numerical values\n");
@@ -105,6 +112,37 @@ int main(int argc, const char * argv[]) {
                                 printf("Error: Unidentified language.\n");
                                 return 0;
                             }
+                        }
+                        translate = 0;
+                        break;
+                        
+                    case 'T' :
+                        if (arg >= argc - 2) {
+                            printf("Error: No language specified.\n");
+                            return 0;
+                        }
+                        else {
+                            arg++;
+                            /* This is a bit hacky, but we need a leading "if" for "else if" */
+                            if (argv[arg] == NULL) {return PARSE_MEMORY;}
+#define X(id, name) else if(strcmp(argv[arg], name) == 0) prse = Parse##id;
+                            X_LANGUAGES
+#undef X
+                            else {
+                                printf("Error: Unidentified first language.\n");
+                                return 0;
+                            }
+                            arg++;
+                            /* This is a bit hacky, but we need a leading "if" for "else if" */
+                            if (argv[arg] == NULL) {return PARSE_MEMORY;}
+#define X(id, name) else if(strcmp(argv[arg], name) == 0) prnt = Print##id;
+                            X_LANGUAGES
+#undef X
+                            else {
+                                printf("Error: Unidentified second language.\n");
+                                return 0;
+                            }
+                            translate = 1;
                         }
                         break;
                         
@@ -144,6 +182,8 @@ int main(int argc, const char * argv[]) {
             }
         }
     }
+    
+    /* Parse variables */
     int err, num, read;
     
     if (print_diagnostics) {
@@ -163,15 +203,25 @@ int main(int argc, const char * argv[]) {
     
     if (print_diagnostics){
         printf("Success! %d BF characters read, condensed into %d VM commands.\n", read, num);
+    }
+
+    if (translate) {
+        if (print_diagnostics) printf("Translating...\n");
         (*prnt)(NULL, prgm);
         printf("\n");
-        printf("Running...\n");
     }
-    if (argc == 1) printf("\n");
-    int vm_run = run(prgm, print_diagnostics, printmode);
-    if (print_diagnostics) {
-        printf("%d total VM commands run.\n", vm_run);
+    else {
+        if (print_diagnostics){
+            (*prnt)(NULL, prgm);
+            printf("\n");
+            printf("Running...\n");
+        }
+        int vm_run = run(prgm, print_diagnostics, printmode);
+        if (print_diagnostics) {
+            printf("%d total VM commands run.\n", vm_run);
+        }
     }
+    free(prgm);
     return 0;
 }
 
