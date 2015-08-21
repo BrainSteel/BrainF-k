@@ -18,9 +18,9 @@ typedef void (*PrintFunction) (const char* file, bf_command* prgm);
 extern int matchBrackets(bf_command* prgm);
 
 /* Master language list X-Macro (id, name) */
-#define X_LANGUAGES  X(BF, "BF")   \
-X(QQQ, "???")
-//X(TBF, "TinyBF") /* Sooon */
+#define X_LANGUAGES  X(BF, "BF")    \
+X(QQQ, "???")                       \
+X(TBF, "TinyBF")
 
 /* Declare print and parse functions for the language list */
 #define X(id, name)                                                                     \

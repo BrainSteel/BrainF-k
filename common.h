@@ -4,7 +4,7 @@
 
 #define VERSION_MAJOR 1
 #define VERSION_PATCH 3
-#define VERSION_TEST 1
+#define VERSION_TEST 3
 
 typedef enum {
     bf_end,

@@ -2,37 +2,10 @@
  Brainf>>k
  BF interpreter written by @BrainSteel at PPCG.SE
  http://codegolf.stackexchange.com/users/31054/brainsteel
- 
- Usage:
- 
- bf [-d] [-h] [-L <language>] [-P <print mode>] [-T <lang1> <lang2>] <file>
- 
- 8/20/15 1.3.2
- Added -T flag for translation
- 
- 8/20/15 1.3.1
- Added ??? to the language list
- Added -P flag and print modes : char, num, hex, smart
- 
- 8/20/15 1.3.0
- General Parser implementation
- Code restructure
- Usage improved
- Various minor fixes and changes
- 
- 8/11/15 V1.2.0
- '~' Prints the tape up to the position of the current pointer if the -d option is enabled
- No longer freaks out about mismatched brackets in some circumstances.
- 
- 11/20/14 V1.1.0
- Command line arguments accepted
- 
- 11/17/14 V1.0.0
- Full interpreter
- Minor optimizations
- Flag -d for diagnostics
- 
+
  */
+
+#define USAGE "bf [-help] [options] file\n"
 
 #include "stdio.h"
 #include "stdlib.h"
@@ -60,8 +33,7 @@ int main(int argc, const char * argv[]) {
     /* We no longer support an on-the-fly interpreter (interactive mode may be in the works) */
     if (argc < 2) {
         printf("Brainf>>k Interpreter V%d.%d.%d\n", VERSION_MAJOR, VERSION_PATCH, VERSION_TEST);
-        printf("Usage: bf [-h] [-d] [-L <language>] [-P <print mode>] "
-               "[-T <lang1> <lang2>] <file>\n");
+        printf("Usage: " USAGE);
         return 0;
     }
     else {
@@ -77,8 +49,7 @@ int main(int argc, const char * argv[]) {
                     
                     case 'h' :
                         printf("Brainf>>k Interpreter V%d.%d.%d\n", VERSION_MAJOR, VERSION_PATCH, VERSION_TEST);
-                        printf("Usage: bf [-d] [-h] [-L <language>] [-P <print mode>] "
-                               "[-T <lang1> <lang2>] <file>\n");
+                        printf("Usage: " USAGE);
                         printf("Options:\n");
                         printf("\t-d : Enable debugging symbols and print diagnostics\n");
                         printf("\t-h : Print help\n");
@@ -176,9 +147,13 @@ int main(int argc, const char * argv[]) {
                         return 0;
                 }
             }
-            else {
+            else if (arg == argc - 1){
                 /* This *should* be the last argument */
                 cfile = (char*)argv[arg];
+            }
+            else {
+                printf("Error: Unidentified argument. Use -h for usage details.\n");
+                return 0;
             }
         }
     }
@@ -195,6 +170,7 @@ int main(int argc, const char * argv[]) {
         if (prgm) {
             printf("Information parsed:\n");
             (*prnt)(NULL, prgm);
+            printf("\n");
             free(prgm);
         }
         printf("PARSING ENDED WITH ERROR CODE %d\n", err);
@@ -218,7 +194,7 @@ int main(int argc, const char * argv[]) {
         }
         int vm_run = run(prgm, print_diagnostics, printmode);
         if (print_diagnostics) {
-            printf("%d total VM commands run.\n", vm_run);
+            printf("\n%d total VM commands run.\n", vm_run);
         }
     }
     free(prgm);
@@ -228,7 +204,7 @@ int main(int argc, const char * argv[]) {
 int run(bf_command* prgm, int debug, void (*printchar)(char byte)){
     int ptr;
     int cmd_run;
-    char RAM[30000];
+    unsigned char RAM[30000];
     for (ptr = 0; ptr < 30000; ptr++) {
         RAM[ptr] = 0;
     }

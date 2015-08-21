@@ -50,6 +50,7 @@ bf_command* ParseBF(const char* file, int* num, int* read, int* error){
                         prgm[current].val = 1;
                     }
                 }
+                last = c;
                 break;
                 
             case '-':
@@ -73,6 +74,7 @@ bf_command* ParseBF(const char* file, int* num, int* read, int* error){
                         prgm[current].val = 1;
                     }
                 }
+                last = c;
                 break;
                 
             case '>':
@@ -96,6 +98,7 @@ bf_command* ParseBF(const char* file, int* num, int* read, int* error){
                         prgm[current].val = 1;
                     }
                 }
+                last = c;
                 break;
                 
             case '<':
@@ -119,6 +122,7 @@ bf_command* ParseBF(const char* file, int* num, int* read, int* error){
                         prgm[current].val = 1;
                     }
                 }
+                last = c;
                 break;
                 
             case ',':
@@ -137,6 +141,7 @@ bf_command* ParseBF(const char* file, int* num, int* read, int* error){
                     prgm[current].type = bf_input;
                     prgm[current].val = -1;
                 }
+                last = c;
                 break;
                 
             case '.':
@@ -155,6 +160,7 @@ bf_command* ParseBF(const char* file, int* num, int* read, int* error){
                     prgm[current].type = bf_output;
                     prgm[current].val = -1;
                 }
+                last = c;
                 break;
                 
             case '[':
@@ -173,6 +179,7 @@ bf_command* ParseBF(const char* file, int* num, int* read, int* error){
                     prgm[current].type = bf_open;
                     prgm[current].val = -1;
                 }
+                last = c;
                 break;
                 
             case ']':
@@ -191,6 +198,7 @@ bf_command* ParseBF(const char* file, int* num, int* read, int* error){
                     prgm[current].type = bf_close;
                     prgm[current].val = -1;
                 }
+                last = c;
                 break;
                 
             case '~':
@@ -203,16 +211,16 @@ bf_command* ParseBF(const char* file, int* num, int* read, int* error){
                 }
                 else {
                     prgm = tmp;
+                    prse_num++;
                     current = prse_num - 1;
                     prgm[current].type = bf_debug;
                     prgm[current].val = -1;
                 }
+                last = c;
                 break;
             default:
                 break;
         }
-        
-        last = c;
         c = getc(fp);
     }
     
