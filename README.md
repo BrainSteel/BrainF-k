@@ -1,11 +1,11 @@
-# BrainF>>k V1.3.2
+# BrainF>>k V1.3.3
 Fully functional BF and BF-equivalent interpreter
 
 ###Build:
 Run `make` in the top-level directory.
 
 ###Usage:
-`bf [-d] [-h] [-L <language>] [-P <print mode>] <file>`
+`bf [-help] [options] file`
 
 ###Specifics
 
