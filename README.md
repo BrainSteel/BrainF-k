@@ -21,6 +21,7 @@ Run `make` in the top-level directory.
 |:-----------------:|---------------------------------------------------------------------------------------  |
 | `BF`              |   [Brainf**k](https://esolangs.org/wiki/Brainfuck) (default)                            |
 | `???`             |   [???](https://esolangs.org/wiki/%3F%3F%3F)                                            |
+| `TinyBF`          |   [TinyBF](https://esolangs.org/wiki/TinyBF)                                            |
 
 | Print Modes       |                                                                                         |
 |:-----------------:|---------------------------------------------------------------------------------------  |
