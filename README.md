@@ -1,4 +1,4 @@
-# BrainF>>k V1.3.1
+# BrainF>>k V1.3.2
 Fully functional BF and BF-equivalent interpreter
 
 ###Build:
