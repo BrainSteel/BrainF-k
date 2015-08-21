@@ -9,12 +9,13 @@ Run `make` in the top-level directory.
 
 ###Specifics
 
-| Options           |                                                                                         |
-|:-----------------:|---------------------------------------------------------------------------------------- |
-| `-d`              | Enable debugging and diagnostics                                                        |
-| `-h`              | Print help text                                                                         |
-| `-L <language>`   | Sets the language to interpret (BF is default)                                          |
-| `-P <print mode>` | Sets the print mode for output of the language (char is default)                        |
+| Options             |                                                                                       |
+|:-------------------:|-------------------------------------------------------------------------------------- |
+| `-d`                | Enable debugging and diagnostics                                                      |
+| `-h`                | Print help text                                                                       |
+| `-L <language>`     | Sets the language to interpret (BF is default)                                        |
+| `-P <print mode>`   | Sets the print mode for output of the language (char is default)                      |
+| `-T <lang1> <lang2>`| Translates the file given from `<lang1>` to `<lang2>`                                 |
 
 | Languages         |                                                                                         |
 |:-----------------:|---------------------------------------------------------------------------------------  |
